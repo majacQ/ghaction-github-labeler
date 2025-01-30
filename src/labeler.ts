@@ -46,7 +46,7 @@ export class Labeler {
   }
 
   async run(): Promise<void> {
-    let hasError: boolean = false;
+    let hasError = false;
 
     for (const label of await this.labels) {
       switch (label.ghaction_status) {
@@ -122,7 +122,7 @@ export class Labeler {
           previews: ['symmetra']
         }
       };
-      await this.octokit.issues.createLabel(params);
+      await this.octokit.rest.issues.createLabel(params);
       return true;
     } catch (err) {
       core.error(`Cannot create "${label.name}" label: ${err.message}`);
@@ -141,7 +141,7 @@ export class Labeler {
           previews: ['symmetra']
         }
       };
-      await this.octokit.issues.updateLabel(params);
+      await this.octokit.rest.issues.updateLabel(params);
       return true;
     } catch (err) {
       core.error(`Cannot update "${label.name}" label: ${err.message}`);
@@ -161,7 +161,7 @@ export class Labeler {
           previews: ['symmetra']
         }
       };
-      await this.octokit.issues.updateLabel(params);
+      await this.octokit.rest.issues.updateLabel(params);
       return true;
     } catch (err) {
       core.error(`Cannot rename "${label.from_name}" label: ${err.message}`);
@@ -175,7 +175,7 @@ export class Labeler {
         ...github.context.repo,
         name: label.name
       };
-      await this.octokit.issues.deleteLabel(params);
+      await this.octokit.rest.issues.deleteLabel(params);
       return true;
     } catch (err) {
       core.error(`Cannot delete "${label.name}" label: ${err.message}`);
@@ -185,7 +185,7 @@ export class Labeler {
 
   private async getRepoLabels(): Promise<Label[]> {
     return (
-      await this.octokit.paginate(this.octokit.issues.listLabelsForRepo, {
+      await this.octokit.paginate(this.octokit.rest.issues.listLabelsForRepo, {
         ...github.context.repo
       })
     ).map(label => {
@@ -198,11 +198,11 @@ export class Labeler {
   }
 
   private static async loadLabelsFromYAML(yamlFile: fs.PathLike): Promise<Label[]> {
-    return yaml.load(fs.readFileSync(yamlFile, {encoding: 'utf-8'})) as Promise<Label[]>;
+    return yaml.load(fs.readFileSync(yamlFile, {encoding: 'utf-8'}), {schema: yaml.FAILSAFE_SCHEMA}) as Promise<Label[]>;
   }
 
   private async computeActionLabels(): Promise<Label[]> {
-    let labels = Array<Label>();
+    const labels = Array<Label>();
     let exclusions: string[] = [];
 
     if (this.exclude.length > 0) {
@@ -212,7 +212,11 @@ export class Labeler {
       );
     }
 
-    for (const fileLabel of await this.fileLabels) {
+    const fileLabels = await this.fileLabels;
+    for (const fileLabel of fileLabels) {
+      // Allow color hex codes (e.g., '#cccccc') to be set even though GitHub's API requires the # sign not to be present.
+      fileLabel.color = this.sanitizeColorString(fileLabel.color);
+
       const repoLabel = await this.getRepoLabel(fileLabel.name);
 
       // Rename
@@ -282,7 +286,8 @@ export class Labeler {
     }
 
     // Delete
-    for (const repoLabel of await this.repoLabels) {
+    const repoLabels = await this.repoLabels;
+    for (const repoLabel of repoLabels) {
       if (await this.getFileLabel(repoLabel.name)) {
         continue;
       }
@@ -305,33 +310,30 @@ export class Labeler {
   }
 
   private async getRepoLabel(name: string): Promise<Label | undefined> {
-    for (const repoLabel of await this.repoLabels) {
-      if (name == repoLabel.name) {
-        return repoLabel;
-      }
-    }
-    return undefined;
+    const repoLabels = await this.repoLabels;
+    return repoLabels.find(repoLabel => repoLabel.name === name);
   }
 
   private async getFileLabel(name: string): Promise<Label | undefined> {
-    for (const fileLabel of await this.fileLabels) {
-      if (name == fileLabel.name || name == fileLabel.from_name) {
-        return fileLabel;
-      }
-    }
-    return undefined;
+    const fileLabels = await this.fileLabels;
+    return fileLabels.find(fileLabel => name === fileLabel.name || name === fileLabel.from_name);
   }
 
   async printRepoLabels() {
-    let labels = Array<Label>();
-    for (const repoLabel of await this.repoLabels) {
+    const labels = Array<Label>();
+    const repoLabels = await this.repoLabels;
+    for (const repoLabel of repoLabels) {
       labels.push({
         name: repoLabel.name,
         color: repoLabel.color,
         description: repoLabel.description
       });
     }
-    core.info(`👉 Current labels\n${yaml.safeDump(labels).toString()}`);
+    core.info(`👉 Current labels\n${yaml.dump(labels).toString()}`);
+  }
+
+  private sanitizeColorString(color: string) {
+    return color.replace(/^#/, '');
   }
 
   private logInfo(message: string) {

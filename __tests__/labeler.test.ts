@@ -1,12 +1,23 @@
+import {describe, expect, jest, test} from '@jest/globals';
+import * as fs from 'fs';
+import * as path from 'path';
+
 import {Inputs} from '../src/context';
-import {Labeler, LabelStatus} from '../src/labeler';
+import {Label, Labeler, LabelStatus} from '../src/labeler';
+
+const fixturesDir = path.join(__dirname, 'fixtures');
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+jest.spyOn(Labeler.prototype as any, 'getRepoLabels').mockImplementation((): Promise<Label[]> => {
+  return <Promise<Label[]>>JSON.parse(fs.readFileSync(path.join(fixturesDir, 'repoLabels.json'), 'utf-8'));
+});
 
 const cases = [
   [
     'labels.update.yml',
     {
-      githubToken: process.env.GITHUB_TOKEN || '',
-      yamlFile: '.res/labels.update.yml',
+      githubToken: 'n/a',
+      yamlFile: path.join(fixturesDir, 'labels.update.yml'),
       skipDelete: true,
       dryRun: true,
       exclude: []
@@ -24,8 +35,8 @@ const cases = [
   [
     'labels.exclude1.yml',
     {
-      githubToken: process.env.GITHUB_TOKEN || '',
-      yamlFile: '.res/labels.exclude1.yml',
+      githubToken: 'n/a',
+      yamlFile: path.join(fixturesDir, 'labels.exclude1.yml'),
       skipDelete: true,
       dryRun: true,
       exclude: ['* d*', '*enhancement', '*fix']
@@ -43,8 +54,8 @@ const cases = [
   [
     'labels.exclude2.yml',
     {
-      githubToken: process.env.GITHUB_TOKEN || '',
-      yamlFile: '.res/labels.exclude2.yml',
+      githubToken: 'n/a',
+      yamlFile: path.join(fixturesDir, 'labels.exclude2.yml'),
       skipDelete: true,
       dryRun: true,
       exclude: ['*fix']
@@ -56,6 +67,44 @@ const cases = [
       update: 0,
       rename: 0,
       delete: 4,
+      error: 0
+    }
+  ],
+  [
+    'labels.hexcodes.yml',
+    {
+      githubToken: 'n/a',
+      yamlFile: path.join(fixturesDir, 'labels.hexcodes.yml'),
+      skipDelete: true,
+      dryRun: true,
+      exclude: []
+    },
+    {
+      skip: 10,
+      exclude: 0,
+      create: 0,
+      update: 0,
+      rename: 0,
+      delete: 11,
+      error: 0
+    }
+  ],
+  [
+    'labels.failsafe_schema.yml',
+    {
+      githubToken: 'n/a',
+      yamlFile: path.join(fixturesDir, 'labels.failsafe_schema.yml'),
+      skipDelete: true,
+      dryRun: true,
+      exclude: []
+    },
+    {
+      skip: 2,
+      exclude: 0,
+      create: 1,
+      update: 2,
+      rename: 1,
+      delete: 16,
       error: 0
     }
   ]
@@ -80,7 +129,8 @@ describe('run', () => {
       delete: 0,
       error: 0
     };
-    for (const label of await labeler.labels) {
+    const labels = await labeler.labels;
+    for (const label of labels) {
       switch (label.ghaction_status) {
         case LabelStatus.Exclude: {
           res.exclude++;
