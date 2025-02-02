@@ -1,5 +1,7 @@
-variable "GITHUB_REPOSITORY" {
-  default = "crazy-max/ghaction-github-labeler"
+target "_common" {
+  args = {
+    BUILDKIT_CONTEXT_KEEP_GIT_DIR = 1
+  }
 }
 
 group "default" {
@@ -7,56 +9,65 @@ group "default" {
 }
 
 group "pre-checkin" {
-  targets = ["update-yarn", "format", "build"]
+  targets = ["vendor", "format", "build"]
 }
 
 group "validate" {
-  targets = ["validate-format", "validate-build", "validate-yarn"]
-}
-
-target "dockerfile" {
-  dockerfile = "Dockerfile.dev"
-}
-
-target "update-yarn" {
-  inherits = ["dockerfile"]
-  target = "update-yarn"
-  output = ["."]
+  targets = ["lint", "build-validate", "vendor-validate"]
 }
 
 target "build" {
-  inherits = ["dockerfile"]
-  target = "dist"
+  inherits = ["_common"]
+  dockerfile = "dev.Dockerfile"
+  target = "build-update"
   output = ["."]
 }
 
-//target "test" {
-//  args = {
-//    GITHUB_REPOSITORY = "${GITHUB_REPOSITORY}"
-//  }
-//  inherits = ["dockerfile"]
-//  secret = ["id=github_token,src=.dev/.ghtoken"]
-//  target = "test-coverage"
-//  output = ["."]
-//}
+target "build-validate" {
+  inherits = ["_common"]
+  dockerfile = "dev.Dockerfile"
+  target = "build-validate"
+  output = ["type=cacheonly"]
+}
 
 target "format" {
-  inherits = ["dockerfile"]
-  target = "format"
+  inherits = ["_common"]
+  dockerfile = "dev.Dockerfile"
+  target = "format-update"
   output = ["."]
 }
 
-target "validate-format" {
-  inherits = ["dockerfile"]
-  target = "validate-format"
+target "lint" {
+  inherits = ["_common"]
+  dockerfile = "dev.Dockerfile"
+  target = "lint"
+  output = ["type=cacheonly"]
 }
 
-target "validate-build" {
-  inherits = ["dockerfile"]
-  target = "validate-build"
+target "vendor" {
+  inherits = ["_common"]
+  dockerfile = "dev.Dockerfile"
+  target = "vendor-update"
+  output = ["."]
 }
 
-target "validate-yarn" {
-  inherits = ["dockerfile"]
-  target = "validate-yarn"
+target "vendor-validate" {
+  inherits = ["_common"]
+  dockerfile = "dev.Dockerfile"
+  target = "vendor-validate"
+  output = ["type=cacheonly"]
+}
+
+variable "GITHUB_REPOSITORY" {
+  default = "crazy-max/ghaction-github-labeler"
+}
+
+target "test" {
+  inherits = ["_common"]
+  dockerfile = "dev.Dockerfile"
+  args = {
+    GITHUB_REPOSITORY = GITHUB_REPOSITORY
+  }
+  target = "test-coverage"
+  output = ["./coverage"]
 }

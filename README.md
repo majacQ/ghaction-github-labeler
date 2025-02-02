@@ -1,6 +1,6 @@
 [![GitHub release](https://img.shields.io/github/release/crazy-max/ghaction-github-labeler.svg?style=flat-square)](https://github.com/crazy-max/ghaction-github-labeler/releases/latest)
 [![GitHub marketplace](https://img.shields.io/badge/marketplace-github--labeler-blue?logo=github&style=flat-square)](https://github.com/marketplace/actions/github-labeler)
-[![Test workflow](https://img.shields.io/github/workflow/status/crazy-max/ghaction-github-labeler/test?label=test&logo=github&style=flat-square)](https://github.com/crazy-max/ghaction-github-labeler/actions?workflow=test)
+[![Test workflow](https://img.shields.io/github/actions/workflow/status/crazy-max/ghaction-github-labeler/test.yml?branch=master&label=test&logo=github&style=flat-square)](https://github.com/crazy-max/ghaction-github-labeler/actions?workflow=test)
 [![Codecov](https://img.shields.io/codecov/c/github/crazy-max/ghaction-github-labeler?logo=codecov&style=flat-square)](https://codecov.io/gh/crazy-max/ghaction-github-labeler)
 [![Become a sponsor](https://img.shields.io/badge/sponsor-crazy--max-181717.svg?logo=github&style=flat-square)](https://github.com/sponsors/crazy-max)
 [![Paypal Donate](https://img.shields.io/badge/donate-paypal-00457c.svg?logo=paypal&style=flat-square)](https://www.paypal.me/crazyws)
@@ -9,9 +9,7 @@
 
 GitHub Action to manage labels on GitHub (create/rename/update/delete) as code.
 
-If you are interested, [check out](https://git.io/Je09Y) my other :octocat: GitHub Actions!
-
-![GitHub Labeler](.res/ghaction-github-labeler.png)
+![GitHub Labeler](.github/ghaction-github-labeler.png)
 
 ___
 
@@ -20,30 +18,31 @@ ___
   * [Workflow](#workflow)
 * [Customizing](#customizing)
   * [inputs](#inputs)
-* [Keep up-to-date with GitHub Dependabot](#keep-up-to-date-with-github-dependabot)
-* [How can I help?](#how-can-i-help)
+* [Contributing](#contributing)
 * [License](#license)
 
 ## Usage
 
 ### YAML configuration
 
-In the repository where you want to perform this action, create the YAML file `.github/labels.yml` (you can also set a [custom filename](#customizing)) that looks like:
+In the repository where you want to perform this action, create the YAML file
+`.github/labels.yml` (you can also set a [custom filename](#customizing)) that
+looks like:
 
 ```yaml
 - name: "bug"
-  color: "d73a4a"
+  color: "#d73a4a"
   description: "Something isn't working"
 - name: "documentation"
-  color: "0075ca"
+  color: "#0075ca"
   description: "Improvements or additions to documentation"
 - name: "duplicate"
-  color: "cfd8d7"
+  color: "#cfd8d7"
   description: "This issue or pull request already exists"
 - name: "enhancement"
-  color: "a22eef"
+  color: "#a22eef"
 - name: "wontfix_it"
-  color: "000000"
+  color: "#000000"
   description: "This will not be worked on"
   from_name: "wontfix"
 ```
@@ -57,30 +56,42 @@ In the repository where you want to perform this action, create the YAML file `.
 ```yaml
 name: github
 
-on: push
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - '.github/labels.yml'
+      - '.github/workflows/labels.yml'
+  pull_request:
+    paths:
+      - '.github/labels.yml'
+      - '.github/workflows/labels.yml'
 
 jobs:
   labeler:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       -
         name: Run Labeler
-        if: success()
-        uses: crazy-max/ghaction-github-labeler@v3
+        uses: crazy-max/ghaction-github-labeler@v5
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           yaml-file: .github/labels.yml
-          skip-delete: false
-          dry-run: false
+          dry-run: ${{ github.event_name == 'pull_request' }}
           exclude: |
             help*
             *issue
 ```
 
-With this workflow, the YAML configuration above on a [fresh repository](.res/samples/original.yml), this will:
+With this workflow, the YAML configuration above on a [fresh repository](samples/original.yml),
+this will:
 
 * Skip `bug` (because same `color` and `description`)
 * Skip `documentation` (because same `color` and `description`)
@@ -98,33 +109,19 @@ With this workflow, the YAML configuration above on a [fresh repository](.res/sa
 
 Following inputs can be used as `step.with` keys
 
-| Name             | Type    | Description                        |
-|------------------|---------|------------------------------------|
-| `github-token`   | String  | [GitHub Token](https://help.github.com/en/actions/configuring-and-managing-workflows/authenticating-with-the-github_token) as provided by `secrets`. (default `${{ github.token }}`) |
-| `yaml-file`      | String  | Path to YAML file containing labels definitions. (default `.github/labels.yml`) |
-| `skip-delete`    | Bool    | If enabled, labels will not be deleted if not found in YAML file. (default `false`) |
-| `dry-run`        | Bool    | If enabled, changes will not be applied. (default `false`)  |
-| `exclude`        | List    | Newline delimited list of labels pattern(s)/matcher to exclude |
+| Name           | Type   | Description                                                                         |
+|----------------|--------|-------------------------------------------------------------------------------------|
+| `yaml-file`    | String | Path to YAML file containing labels definitions. (default `.github/labels.yml`)     |
+| `skip-delete`  | Bool   | If enabled, labels will not be deleted if not found in YAML file. (default `false`) |
+| `dry-run`      | Bool   | If enabled, changes will not be applied. (default `false`)                          |
+| `exclude`      | List   | Newline delimited list of labels pattern(s)/matcher to exclude                      |
 
-## Keep up-to-date with GitHub Dependabot
+## Contributing
 
-Since [Dependabot](https://docs.github.com/en/github/administering-a-repository/keeping-your-actions-up-to-date-with-github-dependabot)
-has [native GitHub Actions support](https://docs.github.com/en/github/administering-a-repository/configuration-options-for-dependency-updates#package-ecosystem),
-to enable it on your GitHub repo all you need to do is add the `.github/dependabot.yml` file:
-
-```yaml
-version: 2
-updates:
-  # Maintain dependencies for GitHub Actions
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "daily"
-```
-
-## How can I help?
-
-All kinds of contributions are welcome :raised_hands:! The most basic way to show your support is to star :star2: the project, or to raise issues :speech_balloon: You can also support this project by [**becoming a sponsor on GitHub**](https://github.com/sponsors/crazy-max) :clap: or by making a [Paypal donation](https://www.paypal.me/crazyws) to ensure this journey continues indefinitely! :rocket:
+Want to contribute? Awesome! The most basic way to show your support is to star
+the project, or to raise issues. You can also support this project by [**becoming a sponsor on GitHub**](https://github.com/sponsors/crazy-max)
+or by making a [PayPal donation](https://www.paypal.me/crazyws) to ensure this
+journey continues indefinitely!
 
 Thanks again for your support, it is much appreciated! :pray:
 
